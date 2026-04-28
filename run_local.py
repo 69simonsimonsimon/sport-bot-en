@@ -83,7 +83,7 @@ def _fetch_trim_render(player: str, sport: str, stamp: str, mode: str,
     clip_dir.mkdir(parents=True, exist_ok=True)
 
     logger.info(f"🎬  Fetching {mode} clips: {player}...")
-    raw_clips = fetch_clips(player, sport, clip_dir, audio_duration, count=3, mode=mode)
+    raw_clips = fetch_clips(player, sport, clip_dir, audio_duration, count=7, mode=mode)
 
     if not raw_clips:
         logger.warning(f"    No {mode} clips found — skipping")
