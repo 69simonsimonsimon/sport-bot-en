@@ -136,9 +136,31 @@ DAILYMOTION_QUERIES = {
 }
 
 PEXELS_QUERIES = {
-    "soccer": ["soccer player", "football game", "soccer match", "football stadium"],
-    "nba":    ["basketball player", "basketball game", "basketball court", "basketball dunk"],
-    "nfl":    ["american football", "football game", "football player", "football stadium"],
+    "soccer": [
+        "soccer player", "football game", "soccer match", "football stadium",
+        "soccer crowd cheering", "football training", "soccer dribbling",
+        "football skills", "soccer referee", "football pitch aerial",
+        "soccer fans stadium", "football kick", "soccer goal celebration",
+        "football warm up", "soccer night game", "football crowd",
+        "soccer player running", "football tackle", "stadium lights sport",
+        "soccer ball", "football penalty kick", "sport stadium crowd",
+    ],
+    "nba": [
+        "basketball player", "basketball game", "basketball court", "basketball dunk",
+        "basketball crowd", "basketball training", "basketball shooting",
+        "basketball pass", "basketball arena", "nba court lights",
+        "basketball player running", "basketball slam dunk", "indoor sport arena",
+        "basketball warm up", "basketball fans cheering", "sport arena crowd",
+        "basketball referee", "basketball defense", "basketball fast break",
+    ],
+    "nfl": [
+        "american football", "football game", "football player", "football stadium",
+        "american football crowd", "football training", "football helmet",
+        "football tackle", "football touchdown", "sport stadium aerial",
+        "football fans cheering", "football field lights", "american football team",
+        "football warm up", "sport crowd stadium", "football quarterback",
+        "american football action", "football coach", "sport arena night",
+    ],
 }
 
 # ── Highlight queries — TikTok + Instagram (high engagement, YT Content ID risk)
@@ -241,8 +263,10 @@ _REDDIT_VIDEO_DOMAINS = {
 
 def _ytdlp(query_or_url: str, output_dir: Path, before: set,
            is_search: bool = True, timeout: int = 90) -> Path | None:
-    inp = f"ytsearch5:{query_or_url}" if is_search else query_or_url
-    logger.info(f"[clip] yt-dlp: {inp[:80]}")
+    # Use ytsearch10 and pick a random result (1-6) to avoid always getting the same clip
+    start = random.randint(1, 6) if is_search else 1
+    inp = f"ytsearch10:{query_or_url}" if is_search else query_or_url
+    logger.info(f"[clip] yt-dlp (start={start}): {inp[:80]}")
     cmd = [
         "yt-dlp", inp,
         "--match-filter", "duration < 360",
@@ -251,6 +275,7 @@ def _ytdlp(query_or_url: str, output_dir: Path, before: set,
         "-o", str(output_dir / "clip_%(id)s.%(ext)s"),
         "--no-playlist", "--quiet", "--no-warnings",
         "--max-downloads", "1",
+        "--playlist-start", str(start),
         "--socket-timeout", "20",
         "--retries", "3",
         "--no-check-certificate",
