@@ -68,11 +68,4 @@ def generate_tts(text: str, output_path: Path, voice: str = "echo") -> Path:
 
     logger.info(f"[tts] TTS: {len(words)} Wörter")
 
-    el_key = os.environ.get("ELEVENLABS_API_KEY", "").strip()
-    if el_key:
-        try:
-            return _elevenlabs_tts(text, output_path, el_key)
-        except Exception as e:
-            logger.warning(f"[tts] ElevenLabs fehlgeschlagen ({e}) — OpenAI Fallback")
-
     return _openai_tts(text, output_path, voice)
