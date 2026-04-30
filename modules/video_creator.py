@@ -1,7 +1,7 @@
 """
 Video Creator — Sport Bot EN
 Single-Pass: Video loop + filter + audio in ONE ffmpeg call.
-No tmp file, no PTS issues, no duration bug.
+Modern minimal design: clean overlay, no badge, text-stroke karaoke.
 """
 
 import logging
@@ -33,7 +33,6 @@ def _run(cmd, timeout=480):
 
 
 def _sanitize(text: str) -> str:
-    """Strip emoji and chars that break ffmpeg filter parsing."""
     text = text.encode("ascii", "ignore").decode("ascii")
     for ch in ["'", '"', "\\", ":", "[", "]", "=", ";", "%", ","]:
         text = text.replace(ch, "")
@@ -48,8 +47,8 @@ def create_video(clip_path: Path, audio_path: Path, title: str,
     clip_dur  = _get_duration(clip_path)
     logger.info(f"[video] Audio: {audio_dur:.1f}s | Clip: {clip_dur:.1f}s")
 
-    accent = {"soccer": "0x00AAFF", "nba": "0xFF6B00", "nfl": "0x00CC55"}.get(sport, "0x00AAFF")
-    label  = {"soccer": "SOCCER", "nba": "NBA", "nfl": "NFL"}.get(sport, "SPORTS")
+    # Single accent color per sport — used only for thin top line
+    accent = {"soccer": "0x00AAFF", "nba": "0xFF6B00", "nfl": "0x00CC55"}.get(sport, "0xFFFFFF")
 
     font = ""
     for fp in ["/usr/share/fonts/truetype/dejavu/DejaVuSans-Bold.ttf",
@@ -60,12 +59,9 @@ def create_video(clip_path: Path, audio_path: Path, title: str,
             break
     fa = f":fontfile={font}" if font else ""
 
-    badge_y   = 44
-    handle_y  = H - 58
-    karaoke_y = H - 320
-    g = [int(H * t) for t in (0.52, 0.62, 0.70, 0.78, 0.87)]
+    karaoke_y = H - 300
 
-    # ── Build karaoke word filters ────────────────────────────────────────────
+    # ── Karaoke word filters — text stroke, no box ─────────────────────────
     karaoke_filters = []
     if words:
         for w in words:
@@ -74,50 +70,33 @@ def create_video(clip_path: Path, audio_path: Path, title: str,
                 continue
             t_start = float(w.get("start", 0))
             t_end   = float(w.get("end", t_start + 0.3))
-            # Dynamic font size — shrink for long words so they never overflow
-            wlen = len(wtext)
-            fs = 90 if wlen <= 8 else (74 if wlen <= 13 else (58 if wlen <= 18 else 46))
+            wlen    = len(wtext)
+            fs      = 96 if wlen <= 8 else (78 if wlen <= 13 else (62 if wlen <= 18 else 48))
             karaoke_filters.append(
                 f"drawtext=text='{wtext}'{fa}"
                 f":enable='between(t,{t_start:.3f},{t_end:.3f})'"
-                f":fontsize={fs}:fontcolor=yellow"
-                f":box=1:boxcolor=black@0.78:boxborderw=14"
-                f":borderw=3:bordercolor=black@0.95"
+                f":fontsize={fs}:fontcolor=white"
+                f":borderw=4:bordercolor=black@1.0"
                 f":x=(w-text_w)/2:y={karaoke_y}"
             )
         logger.info(f"[video] Karaoke: {len(karaoke_filters)} word filters")
 
     vf_parts = [
-        # ── Letterbox scaling (no stretch) ───────────────────────────────────
+        # Scale to portrait
         f"scale={W}:{H}:force_original_aspect_ratio=decrease",
         f"pad={W}:{H}:(ow-iw)/2:(oh-ih)/2:black",
-        # ── Subtle dark vignette ─────────────────────────────────────────────
-        f"drawbox=x=0:y=0:w={W}:h={H}:color=black@0.12:t=fill",
-        # ── Bottom gradient for subtitle readability ─────────────────────────
-        f"drawbox=x=0:y={g[0]}:w={W}:h={H-g[0]}:color=black@0.18:t=fill",
-        f"drawbox=x=0:y={g[1]}:w={W}:h={H-g[1]}:color=black@0.26:t=fill",
-        f"drawbox=x=0:y={g[2]}:w={W}:h={H-g[2]}:color=black@0.34:t=fill",
-        f"drawbox=x=0:y={g[3]}:w={W}:h={H-g[3]}:color=black@0.42:t=fill",
-        f"drawbox=x=0:y={g[4]}:w={W}:h={H-g[4]}:color=black@0.50:t=fill",
-        # ── Top accent line ──────────────────────────────────────────────────
-        f"drawbox=x=0:y=0:w={W}:h=8:color={accent}@1.0:t=fill",
-        # ── Sport badge (top left) ───────────────────────────────────────────
-        f"drawbox=x=28:y={badge_y}:w=220:h=68:color=black@0.60:t=fill",
-        f"drawbox=x=28:y={badge_y}:w=7:h=68:color={accent}@1.0:t=fill",
-        f"drawtext=text='{label}'{fa}:fontsize=32:fontcolor={accent}:x=50:y={badge_y+18}",
-        # ── Bottom accent line ───────────────────────────────────────────────
-        f"drawbox=x=0:y={H-10}:w={W}:h=10:color={accent}@1.0:t=fill",
-        # ── Handle ──────────────────────────────────────────────────────────
-        f"drawtext=text='SynCinSportUS'{fa}:fontsize=24:fontcolor=white@0.55"
-        f":x=(w-text_w)/2:y={handle_y}",
+        # Single clean dark overlay
+        f"drawbox=x=0:y=0:w={W}:h={H}:color=black@0.40:t=fill",
+        # Bottom gradient — just 2 layers for subtitle readability
+        f"drawbox=x=0:y={int(H*0.50)}:w={W}:h={int(H*0.50)}:color=black@0.28:t=fill",
+        f"drawbox=x=0:y={int(H*0.70)}:w={W}:h={int(H*0.30)}:color=black@0.20:t=fill",
+        # Thin accent line at top only
+        f"drawbox=x=0:y=0:w={W}:h=4:color={accent}@1.0:t=fill",
     ]
-
-    # Append karaoke word-by-word filters
     vf_parts.extend(karaoke_filters)
     vf = ",".join(vf_parts)
 
     target_dur = audio_dur + 0.5
-    # Loop enough times to cover target_dur — use at least 8 to handle short clips
     loops = max(8, int(target_dur / max(clip_dur, 1)) + 4)
 
     list_file = output_path.with_name(f"_list_{output_path.stem}.txt")
@@ -126,21 +105,18 @@ def create_video(clip_path: Path, audio_path: Path, title: str,
         encoding="utf-8"
     )
 
-    logger.info(f"[video] Single-Pass: concat x{loops} → filter → encode+audio → {output_path.name}")
+    logger.info(f"[video] Single-Pass → {output_path.name}")
 
     try:
         r = _run([
             "ffmpeg", "-y",
-            # +genpts regenerates timestamps — fixes broken pts from -c copy concat
             "-fflags", "+genpts",
             "-f", "concat", "-safe", "0", "-i", str(list_file),
             "-i", str(audio_path),
             "-filter_complex", f"[0:v]{vf}[vout]",
-            "-map", "[vout]",
-            "-map", "1:a",
+            "-map", "[vout]", "-map", "1:a",
             "-c:v", "libx264", "-preset", "slow", "-crf", "18",
-            "-r", "25",
-            "-pix_fmt", "yuv420p",
+            "-r", "25", "-pix_fmt", "yuv420p",
             "-c:a", "aac", "-b:a", "128k",
             "-t", str(target_dur),
             str(output_path),
@@ -156,10 +132,8 @@ def create_video(clip_path: Path, audio_path: Path, title: str,
     mb = output_path.stat().st_size / 1024 / 1024
     logger.info(f"[video] Done: {output_path.name} ({mb:.1f} MB)")
 
-    # Check duration, not file size (static clips are legitimately small)
     actual_dur = _get_duration(output_path)
     if actual_dur < 20.0:
-        logger.error(f"[video] Output too short ({actual_dur:.1f}s, {mb:.1f} MB) — ffmpeg stderr: {r.stderr[-400:]}")
-        raise RuntimeError(f"Video too short ({actual_dur:.1f}s) — encoding failed")
+        raise RuntimeError(f"Video too short ({actual_dur:.1f}s)")
 
     return output_path
