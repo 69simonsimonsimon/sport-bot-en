@@ -1,0 +1,78 @@
+name: Queue Monitor
+
+on:
+  schedule:
+    - cron: '0 */6 * * *'
+  workflow_dispatch:
+
+jobs:
+  monitor:
+    runs-on: ubuntu-latest
+
+    steps:
+      - name: Check queue and send Telegram alert
+        env:
+          BUNNY_STORAGE_PASSWORD: ${{ secrets.BUNNY_STORAGE_PASSWORD }}
+          BUNNY_STORAGE_NAME: ${{ secrets.BUNNY_STORAGE_NAME }}
+          BUNNY_CDN_URL: ${{ secrets.BUNNY_CDN_URL }}
+          BUNNY_STORAGE_HOSTNAME: ${{ secrets.BUNNY_STORAGE_HOSTNAME }}
+          TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
+          TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
+        run: |
+          python3 -c "
+          import os
+          import json
+          import urllib.request
+
+          password = os.environ['BUNNY_STORAGE_PASSWORD']
+          storage_name = os.environ['BUNNY_STORAGE_NAME']
+          hostname = os.environ['BUNNY_STORAGE_HOSTNAME']
+          bot_token = os.environ['TELEGRAM_BOT_TOKEN']
+          chat_id = os.environ['TELEGRAM_CHAT_ID']
+
+          def list_queue():
+              url = f'https://{hostname}/{storage_name}/queue/'
+              req = urllib.request.Request(url, headers={'AccessKey': password, 'Accept': 'application/json'})
+              try:
+                  with urllib.request.urlopen(req, timeout=15) as resp:
+                      return json.loads(resp.read().decode())
+              except Exception as e:
+                  print(f'Error listing queue: {e}')
+                  return []
+
+          all_files = [f.get('ObjectName','') for f in list_queue() if f.get('ObjectName','').endswith('.mp4')]
+          en_yt      = sum(1 for f in all_files if f.startswith('en_yt_'))
+          de_yt      = sum(1 for f in all_files if f.startswith('de_yt_'))
+          en_regular = sum(1 for f in all_files if f.startswith('en_') and not f.startswith('en_yt_'))
+          de_regular = sum(1 for f in all_files if f.startswith('de_') and not f.startswith('de_yt_'))
+          en_regular_only = en_regular
+          de_regular_only = de_regular
+
+          en_status = '✅' if en_regular_only >= 4 and en_yt >= 4 else '⚠️'
+          de_status = '✅' if de_regular_only >= 4 and de_yt >= 4 else '⚠️'
+
+          lines = [
+              '📊 Sport Queue Status',
+              f'🇺🇸 EN:  regular: {en_regular_only} | yt: {en_yt} {en_status}',
+              f'🇩🇪 DE:  regular: {de_regular_only} | yt: {de_yt} {de_status}',
+          ]
+
+          if en_yt < 4:
+              lines.append(f'⚠️ EN yt queue LOW ({en_yt})')
+          if en_regular_only < 4:
+              lines.append(f'⚠️ EN regular queue LOW ({en_regular_only})')
+          if de_yt < 4:
+              lines.append(f'⚠️ DE yt queue LOW ({de_yt})')
+          if de_regular_only < 4:
+              lines.append(f'⚠️ DE regular queue LOW ({de_regular_only})')
+
+          message = '\n'.join(lines)
+          print(message)
+
+          url = f'https://api.telegram.org/bot{bot_token}/sendMessage'
+          payload = json.dumps({'chat_id': chat_id, 'text': message}).encode()
+          req = urllib.request.Request(url, data=payload, headers={'Content-Type': 'application/json'})
+          with urllib.request.urlopen(req, timeout=15) as resp:
+              result = json.loads(resp.read().decode())
+              print(f'Telegram response: {result.get(\"ok\")}')
+          "

@@ -19,10 +19,11 @@ Usage:
 import json
 import logging
 import os
+import random
 import subprocess
 import sys
 import time
-from datetime import datetime
+from datetime import datetime, date
 from pathlib import Path
 
 from dotenv import load_dotenv
@@ -42,33 +43,45 @@ OUTPUT_DIR = ROOT / "output"
 OUTPUT_DIR.mkdir(exist_ok=True)
 (OUTPUT_DIR / "clips").mkdir(exist_ok=True)
 
+# ── Trending hashtag rotation ─────────────────────────────────────────────────
+_TRENDING_POOL_SPORT = [
+    "#sports2025", "#sportsnews", "#sportsdrama", "#sportstok", "#sportsmoment",
+    "#fypage", "#fypシ", "#viral2025", "#mustwatch", "#shocking", "#unbelievable",
+    "#sportshighlights", "#sportsreaction", "#stitch", "#duet",
+    "#nfl2025", "#nba2025", "#soccer2025", "#footballtok", "#basketballtok",
+]
+
+def _daily_trending_sport(n: int = 3) -> list[str]:
+    seeded = _TRENDING_POOL_SPORT.copy()
+    rng = random.Random(date.today().toordinal())
+    rng.shuffle(seeded)
+    return seeded[:n]
+
 
 def _cleanup_stale_files():
-    """Delete temp files older than 20 min left by previous crashes."""
-    cutoff = time.time() - 20 * 60
-    for pattern in ["audio_*.mp3", "video_*.mp4"]:
+    """Delete temp files older than 20 min left by previous crashes.
+    Also prunes clips/ directory — anything older than 1 hour is gone."""
+    cutoff_short = time.time() - 20 * 60   # 20 min — audio/video in output/
+    cutoff_clips = time.time() - 60 * 60   # 1 hour  — clips can take longer to process
+    removed = 0
+    for pattern in ["audio_*.mp3", "video_*.mp4", "_list_*.txt"]:
         for f in OUTPUT_DIR.glob(pattern):
             try:
-                if f.stat().st_mtime < cutoff:
+                if f.stat().st_mtime < cutoff_short:
                     f.unlink(missing_ok=True)
-                    logger.info(f"🧹  Stale file removed: {f.name}")
+                    removed += 1
             except Exception:
                 pass
-    # Also clean stale clip files
     clips_dir = OUTPUT_DIR / "clips"
-    for f in clips_dir.rglob("*.mp4"):
+    for f in clips_dir.rglob("*"):
         try:
-            if f.stat().st_mtime < cutoff:
+            if f.is_file() and f.stat().st_mtime < cutoff_clips:
                 f.unlink(missing_ok=True)
-                logger.info(f"🧹  Stale clip removed: {f.name}")
+                removed += 1
         except Exception:
             pass
-    for f in clips_dir.rglob("*.txt"):
-        try:
-            if f.stat().st_mtime < cutoff:
-                f.unlink(missing_ok=True)
-        except Exception:
-            pass
+    if removed:
+        logger.info(f"🧹  Cleaned up {removed} stale file(s)")
 
 
 def _bunny_upload(video_path: Path, filename: str, meta: dict) -> str:
@@ -216,7 +229,7 @@ def generate_and_queue(sport: str = None) -> bool:
             "Follow for your daily dose of sports drama!",
         ]
         tts_with_cta = script["tts_text"] + " " + random.choice(_ctas)
-        generate_tts(tts_with_cta, audio_path, voice="echo")
+        generate_tts(tts_with_cta, audio_path, sport=script.get("sport", ""))
 
         probe = subprocess.run(
             ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
@@ -244,9 +257,15 @@ def generate_and_queue(sport: str = None) -> bool:
         except Exception as e:
             logger.warning(f"    Whisper failed (no karaoke): {e}")
 
+        # Enhance caption: stitch bait + trending hashtags
+        _base_caption = script["caption"]
+        _stitch = "\n🎭 Stitch this with your reaction 👇" if random.random() < 0.35 else ""
+        _trending = " ".join(_daily_trending_sport(3))
+        enhanced_caption = f"{_base_caption}{_stitch}\n\n{_trending}" if _trending else _base_caption + _stitch
+
         meta_base = {
             "title":   script["title"],
-            "caption": script["caption"],
+            "caption": enhanced_caption,
             "sport":   script["sport"],
             "player":  script["player"],
         }
