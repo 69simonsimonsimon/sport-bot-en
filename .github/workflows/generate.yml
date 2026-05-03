@@ -2,8 +2,8 @@ name: Generate Sport Videos (EN)
 
 on:
   schedule:
-    - cron: '0 8 * * *'   # 08:00 UTC → highlights + youtube (2 videos)
-    - cron: '0 14 * * *'  # 14:00 UTC → highlights + youtube (2 videos)
+    - cron: '0 8 * * *'   # 08:00 UTC → 3 runs = 6 videos
+    - cron: '0 14 * * *'  # 14:00 UTC → 3 runs = 6 videos
   workflow_dispatch:
 
 jobs:
@@ -46,4 +46,4 @@ jobs:
           BUNNY_STORAGE_HOSTNAME: ${{ secrets.BUNNY_STORAGE_HOSTNAME }}
           TELEGRAM_BOT_TOKEN: ${{ secrets.TELEGRAM_BOT_TOKEN }}
           TELEGRAM_CHAT_ID: ${{ secrets.TELEGRAM_CHAT_ID }}
-        run: python3 run_local.py
+        run: python3 run_local.py "" 3 1
