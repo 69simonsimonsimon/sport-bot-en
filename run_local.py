@@ -207,7 +207,16 @@ def generate_and_queue(sport: str = None) -> bool:
 
         # 3. TTS
         logger.info("🎙️   Generating voiceover...")
-        generate_tts(script["tts_text"], audio_path, voice="echo")
+        _ctas = [
+            "Follow for daily sports news you won't find anywhere else!",
+            "Drop a follow for more breaking sports stories every day!",
+            "Follow us so you never miss the latest in sports!",
+            "Follow for more insane sports moments posted daily!",
+            "Hit follow — we cover the biggest sports stories every day!",
+            "Follow for your daily dose of sports drama!",
+        ]
+        tts_with_cta = script["tts_text"] + " " + random.choice(_ctas)
+        generate_tts(tts_with_cta, audio_path, voice="echo")
 
         probe = subprocess.run(
             ["ffprobe", "-v", "quiet", "-show_entries", "format=duration",
