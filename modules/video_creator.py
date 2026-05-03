@@ -39,6 +39,23 @@ def _sanitize(text: str) -> str:
     return " ".join(text.split()).strip()
 
 
+import random as _random
+
+_SPORT_HOOKS = {
+    "soccer": ["This is absolutely unreal ⚽👀", "Football fans need to see this 😱", "Nobody saw this coming ⚽🔥"],
+    "nba":    ["This play is INSANE 🏀😱", "NBA fans won't believe this 👀", "Greatest moment this season 🏀🔥"],
+    "nfl":    ["This changes everything 🏈😱", "NFL fans need to see this 👀", "The most insane play 🏈🔥"],
+}
+_DEFAULT_HOOKS_SPORT = ["Wait for it… 👀🔥", "You won't believe this 😱", "This actually happened 🔥"]
+
+_SPORT_QUESTIONS = {
+    "soccer": "Who do you think was right? Comment 👇",
+    "nba":    "Best play you've seen this season? Comment 👇",
+    "nfl":    "What's your take? Comment 👇",
+}
+_DEFAULT_QUESTION_SPORT = "What do you think? Comment 👇"
+
+
 def create_video(clip_path: Path, audio_path: Path, title: str,
                  output_path: Path, sport: str = "soccer",
                  words: list = None) -> Path:
@@ -46,6 +63,11 @@ def create_video(clip_path: Path, audio_path: Path, title: str,
     audio_dur = _get_duration(audio_path)
     clip_dur  = _get_duration(clip_path)
     logger.info(f"[video] Audio: {audio_dur:.1f}s | Clip: {clip_dur:.1f}s")
+
+    hook_text     = _random.choice(_SPORT_HOOKS.get(sport, _DEFAULT_HOOKS_SPORT))
+    comment_q     = _SPORT_QUESTIONS.get(sport, _DEFAULT_QUESTION_SPORT)
+    hook_end      = 2.5
+    cta_start     = max(0, audio_dur - 2.5)
 
     # Single accent color per sport — used only for thin top line
     accent = {"soccer": "0x00AAFF", "nba": "0xFF6B00", "nfl": "0x00CC55"}.get(sport, "0xFFFFFF")
@@ -81,6 +103,9 @@ def create_video(clip_path: Path, audio_path: Path, title: str,
             )
         logger.info(f"[video] Karaoke: {len(karaoke_filters)} word filters")
 
+    hook_safe = _sanitize(hook_text)
+    cta_safe  = _sanitize(comment_q)
+
     vf_parts = [
         # Scale to portrait
         f"scale={W}:{H}:force_original_aspect_ratio=decrease",
@@ -92,6 +117,20 @@ def create_video(clip_path: Path, audio_path: Path, title: str,
         f"drawbox=x=0:y={int(H*0.70)}:w={W}:h={int(H*0.30)}:color=black@0.20:t=fill",
         # Thin accent line at top only
         f"drawbox=x=0:y=0:w={W}:h=4:color={accent}@1.0:t=fill",
+        # Hook overlay: first 2.5s — centered, dark bg box + white text
+        f"drawbox=x=0:y={int(H*0.40)}:w={W}:h=130:color=black@0.75:t=fill"
+        f":enable='between(t,0,{hook_end})'",
+        f"drawtext=text='{hook_safe}'{fa}"
+        f":enable='between(t,0,{hook_end})'"
+        f":fontsize=58:fontcolor=white:borderw=3:bordercolor=black@1.0"
+        f":x=(w-text_w)/2:y={int(H*0.42)}",
+        # Comment-bait CTA: last 2.5s — yellow text centered
+        f"drawbox=x=0:y={int(H*0.48)}:w={W}:h=110:color=black@0.75:t=fill"
+        f":enable='gte(t,{cta_start:.1f})'",
+        f"drawtext=text='{cta_safe}'{fa}"
+        f":enable='gte(t,{cta_start:.1f})'"
+        f":fontsize=52:fontcolor=0xFFE600:borderw=3:bordercolor=black@1.0"
+        f":x=(w-text_w)/2:y={int(H*0.50)}",
     ]
     vf_parts.extend(karaoke_filters)
     vf = ",".join(vf_parts)
