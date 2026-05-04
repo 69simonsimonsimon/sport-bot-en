@@ -1,44 +1,13 @@
 """
 TTS Generator — Sport Bot EN
-ElevenLabs (primär) → OpenAI Fallback
+OpenAI TTS
 """
 
 import logging
 import os
 from pathlib import Path
 
-import requests as _requests
-
 logger = logging.getLogger("syncin")
-
-# ElevenLabs: Adam — tief, autoritativ, gut für Sport-Kommentar
-_EL_VOICE_ID = os.environ.get("ELEVENLABS_VOICE_ID", "pNInz6obpgDQGcFmaJgB")
-_EL_MODEL    = "eleven_multilingual_v2"
-
-
-def _elevenlabs_tts(text: str, output_path: Path, api_key: str) -> Path:
-    url  = f"https://api.elevenlabs.io/v1/text-to-speech/{_EL_VOICE_ID}"
-    resp = _requests.post(
-        url,
-        headers={"xi-api-key": api_key, "Content-Type": "application/json"},
-        json={
-            "text":       text,
-            "model_id":   _EL_MODEL,
-            "voice_settings": {
-                "stability":        0.45,
-                "similarity_boost": 0.80,
-                "style":            0.35,
-                "use_speaker_boost": True,
-            },
-        },
-        timeout=120,
-    )
-    resp.raise_for_status()
-    output_path.parent.mkdir(exist_ok=True, parents=True)
-    with open(str(output_path), "wb") as f:
-        f.write(resp.content)
-    logger.info(f"[tts] ElevenLabs audio saved: {output_path.name}")
-    return output_path
 
 
 def _openai_tts(text: str, output_path: Path, voice: str = "echo",
