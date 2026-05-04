@@ -91,12 +91,12 @@ ARTICLE CONTENT: {content}
 SPORT: {sport_label}
 {facts_warning}
 
-Write a CONTROVERSIAL TikTok voiceover script in English. The script MUST be exactly 110-140 words.
-Requirements:
-1. Start with a STRONG statement based on real facts from the article
-2. Comment on what happened — hard-hitting but fact-based
-3. Rage-bait is fine ("Nobody wants to admit it, but...") — as long as it's grounded in real info
-4. End with "Drop your opinion in the comments!"
+Write a CONTROVERSIAL TikTok voiceover script in English. The script MUST be exactly 140-160 words.
+STRUCTURE (follow this order!):
+1. HOOK (sentence 1-2): The most shocking or provocative fact from the article FIRST. Must stop the scroll: "Nobody saw this coming..." / "This changes everything..." / "Nobody wants to admit it, but..."
+2. BUILD-UP (sentences 3-5): Context that makes the shock even bigger. Concrete numbers/facts from the article.
+3. OPINION (sentences 6-8): Your hard, clear take — provocative but fact-based. Can be divisive.
+4. CALL TO ACTION (last sentence): End with "Drop your opinion in the comments!"
 
 After the script, provide these metadata fields:
 TITLE: (clickable title with emojis, max 60 chars)
@@ -117,12 +117,12 @@ ARTICLE CONTENT: {content}
 SPORT: {sport_label}
 {facts_warning}
 
-Write an ENGAGING TikTok voiceover script in English. The script MUST be exactly 110-140 words.
-Requirements:
-1. Start with a strong HOOK based on real facts from the article
-2. Explain what actually happened — clear, direct, opinionated
-3. Bold prediction or take — but marked as your opinion
-4. End with "What do you think? Comment below!"
+Write an ENGAGING TikTok voiceover script in English. The script MUST be exactly 140-160 words.
+STRUCTURE (follow this order!):
+1. HOOK (sentence 1-2): The most surprising or unbelievable fact from the article FIRST. Scroll-stopper: "This just dropped..." / "Nobody saw this coming..." / "It's now official..."
+2. BUILD-UP (sentences 3-5): What happened? Explain with concrete facts from the article.
+3. ANALYSIS (sentences 6-8): Your take on what this means — bold, direct, marked as opinion.
+4. CALL TO ACTION (last sentence): End with "What do you think? Comment below!"
 
 After the script, provide these metadata fields:
 TITLE: (clickable title with emojis, max 60 chars)
@@ -157,10 +157,10 @@ CAPTION: ..."""
     word_count = len(tts_text.split())
     logger.info(f"[script] Script: {word_count} words, mode: {mode}, player: {player}")
 
-    if word_count < 100:
+    if word_count < 120:
         raise ValueError(f"Script too short ({word_count} words)")
-    if word_count > 160:
-        words = tts_text.split()[:155]
+    if word_count > 170:
+        words = tts_text.split()[:165]
         tts_text = " ".join(words) + "."
 
     return {
