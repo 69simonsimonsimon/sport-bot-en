@@ -151,6 +151,22 @@ CAPTION: ..."""
 
     title    = extract("TITLE") or article["title"][:60]
     player   = extract("PLAYER") or ""
+
+    # Player fallback: if empty or too long (likely an error),
+    # extract main names from article title
+    if not player or len(player.split()) > 5:
+        import re as _re
+        _words = article["title"].split()
+        _candidates = [w.strip(".,!?-") for w in _words if w[0].isupper() and len(w) > 3
+                       and w.lower() not in {"the", "and", "for", "with", "from", "after",
+                                              "that", "this", "have", "been", "will", "says",
+                                              "their", "about", "over"}]
+        if _candidates:
+            player = " ".join(_candidates[:2])
+        else:
+            player = {"soccer": "soccer player", "nba": "NBA player", "nfl": "NFL player"}.get(sport, "sports player")
+    logger.info(f"[script] Player after fallback: '{player}'")
+
     hashtags = extract("HASHTAGS") or "#sports #soccer #nba #nfl #fyp #shorts"
     caption  = extract("CAPTION") or f"{title}\n{hashtags}"
 
