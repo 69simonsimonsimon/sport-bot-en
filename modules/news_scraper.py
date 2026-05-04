@@ -156,6 +156,27 @@ def _score_article(title: str, summary: str) -> int:
     return score
 
 
+def _fetch_article_text(url: str, max_chars: int = 2000) -> str:
+    """Tries to scrape the full article text for better fact accuracy."""
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36",
+            "Accept-Language": "en-US,en;q=0.9",
+        }
+        resp = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
+        resp.raise_for_status()
+        html = resp.text
+        paragraphs = re.findall(r"<p[^>]*>(.*?)</p>", html, re.DOTALL | re.IGNORECASE)
+        text = " ".join(re.sub(r"<[^>]+>", "", p).strip() for p in paragraphs)
+        text = re.sub(r"\s+", " ", text).strip()
+        if len(text) < 200:
+            return ""
+        return text[:max_chars]
+    except Exception as e:
+        logger.debug(f"Fulltext fetch failed for {url}: {e}")
+        return ""
+
+
 def _fetch_feed(url: str, timeout: int = 10) -> list:
     try:
         headers = {"User-Agent": "Mozilla/5.0 (compatible; SportBot/1.0)"}
@@ -201,8 +222,9 @@ def fetch_news(sport: str = None) -> dict:
             if not title or len(title) < 10:
                 continue
             score = _score_article(title, summary)
-            candidates.append({"title": title, "summary": summary, "link": link,
-                                "sport": sport, "score": score})
+            fulltext = _fetch_article_text(link)
+            candidates.append({"title": title, "summary": summary, "fulltext": fulltext,
+                                "link": link, "sport": sport, "score": score})
 
     if not candidates:
         logger.warning(f"[news] No new articles for {sport} — retrying with fallback")

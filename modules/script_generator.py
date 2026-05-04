@@ -72,27 +72,40 @@ def generate_script(article: dict, mode: str = "auto") -> dict:
 
     sport_label = {"soccer": "SOCCER", "nba": "NBA", "nfl": "NFL"}.get(sport, "SPORTS")
 
+    # Use fulltext if available, otherwise fall back to summary
+    fulltext = article.get("fulltext", "").strip()
+    summary  = article.get("summary", "").strip()
+    content  = fulltext if len(fulltext) > len(summary) else summary
+    if not content:
+        content = "(headline only)"
+
+    facts_warning = """
+⚠️ STRICT RULE: Do NOT invent facts, numbers, quotes or details not explicitly in the article!
+If you give an opinion, make clear it's YOUR take ("I think...", "In my opinion...").
+Stick to facts from the article — you can comment and judge them, but never fabricate."""
+
     if mode == "rage":
         prompt = f"""Based on this sports news:
 TITLE: {article['title']}
-CONTENT: {article['summary']}
+ARTICLE CONTENT: {content}
 SPORT: {sport_label}
+{facts_warning}
 
-Write a CONTROVERSIAL TikTok voiceover script in English. The script MUST be exactly 120-150 words — count carefully.
+Write a CONTROVERSIAL TikTok voiceover script in English. The script MUST be exactly 110-140 words.
 Requirements:
-1. Start with a SHOCKING statement (no question, straight opinion)
-2. BRUTALLY criticize or defend the player/team
-3. Include a rage-bait moment ("Nobody wants to admit it, but...")
+1. Start with a STRONG statement based on real facts from the article
+2. Comment on what happened — hard-hitting but fact-based
+3. Rage-bait is fine ("Nobody wants to admit it, but...") — as long as it's grounded in real info
 4. End with "Drop your opinion in the comments!"
 
 After the script, provide these metadata fields:
-TITLE: (clickable YouTube title with emojis, max 60 chars)
-PLAYER: (main person/team for clip search)
+TITLE: (clickable title with emojis, max 60 chars)
+PLAYER: (main person/team from the article for clip search)
 HASHTAGS: (6 relevant hashtags)
 CAPTION: (1 sentence + hashtags)
 
 Format your response EXACTLY like this:
-SCRIPT: [your 120-150 word script here]
+SCRIPT: [your script here]
 TITLE: ...
 PLAYER: ...
 HASHTAGS: ...
@@ -100,24 +113,25 @@ CAPTION: ..."""
     else:
         prompt = f"""Based on this sports news:
 TITLE: {article['title']}
-CONTENT: {article['summary']}
+ARTICLE CONTENT: {content}
 SPORT: {sport_label}
+{facts_warning}
 
-Write an ENGAGING TikTok voiceover script in English. The script MUST be exactly 120-150 words — count carefully.
+Write an ENGAGING TikTok voiceover script in English. The script MUST be exactly 110-140 words.
 Requirements:
-1. Start with a strong HOOK that grabs viewers immediately
-2. Explain key facts with a clear opinionated angle
-3. Include a surprising take or bold prediction
+1. Start with a strong HOOK based on real facts from the article
+2. Explain what actually happened — clear, direct, opinionated
+3. Bold prediction or take — but marked as your opinion
 4. End with "What do you think? Comment below!"
 
 After the script, provide these metadata fields:
-TITLE: (clickable YouTube title with emojis, max 60 chars)
-PLAYER: (main person/team for clip search)
+TITLE: (clickable title with emojis, max 60 chars)
+PLAYER: (main person/team from the article for clip search)
 HASHTAGS: (6 relevant hashtags)
 CAPTION: (1 sentence + hashtags)
 
 Format your response EXACTLY like this:
-SCRIPT: [your 120-150 word script here]
+SCRIPT: [your script here]
 TITLE: ...
 PLAYER: ...
 HASHTAGS: ...
