@@ -167,6 +167,35 @@ def _fetch_feed(url: str, timeout: int = 10) -> list:
         return []
 
 
+def _fetch_article_text(url: str, max_chars: int = 800) -> str:
+    """
+    Fetches the actual article body text from a URL.
+    Used when the RSS summary is too short (< 120 chars).
+    Returns empty string on failure.
+    """
+    try:
+        headers = {
+            "User-Agent": "Mozilla/5.0 (Windows NT 10.0; Win64; x64) AppleWebKit/537.36 "
+                          "(KHTML, like Gecko) Chrome/122.0.0.0 Safari/537.36"
+        }
+        resp = requests.get(url, headers=headers, timeout=10, allow_redirects=True)
+        resp.raise_for_status()
+        text = resp.text
+        # Remove scripts, styles, nav, etc.
+        text = re.sub(r"<(script|style|nav|header|footer|aside|form)[^>]*>.*?</\1>",
+                      " ", text, flags=re.DOTALL | re.IGNORECASE)
+        # Remove all HTML tags
+        text = re.sub(r"<[^>]+>", " ", text)
+        # Normalize whitespace
+        text = re.sub(r"\s+", " ", text).strip()
+        if len(text) < 80:
+            return ""
+        return text[:max_chars]
+    except Exception as e:
+        logger.debug(f"[news] Article fetch failed ({url[:60]}): {e}")
+        return ""
+
+
 def fetch_news(sport: str = None) -> dict:
     """
     Fetches a suitable sports article.
@@ -186,6 +215,27 @@ def fetch_news(sport: str = None) -> dict:
     feed_urls = FEEDS.get(sport, FEEDS["soccer"])
     random.shuffle(feed_urls)
 
+    def _build_candidate(e: dict, sport: str) -> dict | None:
+        link = e.get("link", "")
+        title = e.get("title", "").strip()
+        summary = e.get("summary", e.get("description", "")).strip()
+        summary = re.sub(r"<[^>]+>", " ", summary).strip()
+        summary = re.sub(r"\s+", " ", summary)[:500]
+        if not title or len(title) < 10:
+            return None
+        # Fetch full article text if summary is too short
+        if len(summary) < 120 and link:
+            fetched = _fetch_article_text(link)
+            if fetched:
+                logger.debug(f"[news] Short summary ({len(summary)}ch) → fetched article ({len(fetched)}ch)")
+                summary = fetched
+        # Skip articles that are still empty after fetch
+        if len(summary.strip()) < 50:
+            logger.debug(f"[news] Skipping empty article: '{title[:50]}'")
+            return None
+        score = _score_article(title, summary)
+        return {"title": title, "summary": summary, "link": link, "sport": sport, "score": score}
+
     candidates = []
     for url in feed_urls:
         entries = _fetch_feed(url)
@@ -193,16 +243,9 @@ def fetch_news(sport: str = None) -> dict:
             link = e.get("link", "")
             if link in used:
                 continue
-            title = e.get("title", "").strip()
-            summary = e.get("summary", e.get("description", "")).strip()
-            # Strip HTML tags
-            summary = re.sub(r"<[^>]+>", " ", summary).strip()
-            summary = re.sub(r"\s+", " ", summary)[:500]
-            if not title or len(title) < 10:
-                continue
-            score = _score_article(title, summary)
-            candidates.append({"title": title, "summary": summary, "link": link,
-                                "sport": sport, "score": score})
+            candidate = _build_candidate(e, sport)
+            if candidate:
+                candidates.append(candidate)
 
     if not candidates:
         logger.warning(f"[news] No new articles for {sport} — retrying with fallback")
@@ -210,13 +253,9 @@ def fetch_news(sport: str = None) -> dict:
         for url in feed_urls:
             entries = _fetch_feed(url)
             for e in entries:
-                title = e.get("title", "").strip()
-                summary = re.sub(r"<[^>]+>", " ",
-                                  e.get("summary", e.get("description", ""))).strip()
-                summary = re.sub(r"\s+", " ", summary)[:500]
-                if title and len(title) >= 10:
-                    candidates.append({"title": title, "summary": summary,
-                                       "link": e.get("link", ""), "sport": sport, "score": 0})
+                candidate = _build_candidate(e, sport)
+                if candidate:
+                    candidates.append(candidate)
 
     if not candidates:
         raise RuntimeError(f"No articles found for sport: {sport}")
