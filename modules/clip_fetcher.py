@@ -20,6 +20,16 @@ from pathlib import Path
 
 logger = logging.getLogger("syncin")
 
+# ── yt-dlp Binary Path ────────────────────────────────────────────────────────
+_YTDLP_BIN = next(
+    (p for p in [
+        "/home/simon/.local/bin/yt-dlp",
+        "/usr/local/bin/yt-dlp",
+        "/usr/bin/yt-dlp",
+    ] if os.path.exists(p)),
+    "yt-dlp",
+)
+
 # ── YouTube Cookie Support ────────────────────────────────────────────────────
 _cookie_file: str | None = None
 
@@ -268,7 +278,7 @@ def _ytdlp(query_or_url: str, output_dir: Path, before: set,
     inp = f"ytsearch10:{query_or_url}" if is_search else query_or_url
     logger.info(f"[clip] yt-dlp (start={start}): {inp[:80]}")
     cmd = [
-        "yt-dlp", inp,
+        _YTDLP_BIN, inp,
         "--match-filter", "duration < 360",
         "--format", "bestvideo[height<=720][ext=mp4]+bestaudio[ext=m4a]/best[height<=720][ext=mp4]/best[height<=720]",
         "--merge-output-format", "mp4",
@@ -417,7 +427,14 @@ def _reddit(player: str, sport: str, output_dir: Path, before: set) -> Path | No
 
     def _fetch(url: str) -> list:
         r = _rq.get(url, headers=headers, timeout=12)
-        return r.json().get("data", {}).get("children", [])
+        if r.status_code != 200 or not r.text.strip():
+            logger.warning(f"[clip] Reddit HTTP {r.status_code} — empty or blocked")
+            return []
+        try:
+            return r.json().get("data", {}).get("children", [])
+        except Exception as e:
+            logger.warning(f"[clip] Reddit JSON error: {e}")
+            return []
 
     def _try_posts(posts: list) -> Path | None:
         for post in posts:
