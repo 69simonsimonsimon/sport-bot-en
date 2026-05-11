@@ -29,6 +29,17 @@ jobs:
       - name: Install Python dependencies
         run: pip install -r requirements.txt
 
+      - name: Restore article history (avoid repeats)
+        uses: actions/cache@v4
+        with:
+          path: output/used_articles.json
+          key: used-articles-en-${{ github.run_number }}
+          restore-keys: |
+            used-articles-en-
+
+      - name: Ensure output directory exists
+        run: mkdir -p output
+
       - name: Generate and queue videos
         env:
           OPENAI_API_KEY: ${{ secrets.OPENAI_API_KEY }}
